@@ -1,0 +1,2 @@
+geometry_msgs/Point32 lowerBound
+geometry_msgs/Point32 upperBound
