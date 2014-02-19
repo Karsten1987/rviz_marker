@@ -115,13 +115,20 @@ target_link_libraries(sot_listener
    ${catkin_LIBRARIES} ${Boost_LIBRARIES}
 )
 
+
+add_executable(closest_points src/rviz_marker_closest_points.cpp)
+target_link_libraries(closest_points
+   ${catkin_LIBRARIES} ${Boost_LIBRARIES}
+)
+
+
+
 #############
 ## Install ##
 #############
 
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
-
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 # install(PROGRAMS

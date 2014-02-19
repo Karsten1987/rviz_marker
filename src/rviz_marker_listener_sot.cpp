@@ -55,16 +55,16 @@ void createMarker(float x, float y, float z, float radius, float r, float g,
 	marker.color.b = b;
 }
 
-void updateMarkerArray(const geometry_msgs::TransformStampedConstPtr& transform, boost::shared_ptr<visualization_msgs::MarkerArray> array) {
+void updateMarkerArray(const geometry_msgs::Vector3StampedConstPtr& transform, boost::shared_ptr<visualization_msgs::MarkerArray> array) {
 //	visualization_msgs::MarkerArray array;
 
 	visualization_msgs::Marker innerBall;
 	visualization_msgs::Marker outerBall;
 
-	createMarker(transform->transform.translation.x, transform->transform.translation.y,
-			transform->transform.translation.z, di, 0.0, 0.0, 0.0, 0.5, innerBall);
-	createMarker(transform->transform.translation.x, transform->transform.translation.y,
-			transform->transform.translation.z, ds, 1.0, 1.0, 0.0, 0.3, outerBall);
+    createMarker(transform->vector.x, transform->vector.y,
+            transform->vector.z, di, 0.0, 0.0, 0.0, 0.5, innerBall);
+    createMarker(transform->vector.x, transform->vector.y,
+            transform->vector.z, ds, 1.0, 1.0, 0.0, 0.3, outerBall);
 
 	array->markers.push_back(innerBall);
 	array->markers.push_back(outerBall);
@@ -83,13 +83,13 @@ void updateDI(const std_msgs::Float64ConstPtr& newDI) {
 }
 
 void syncCallback(const geometry_msgs::Vector3StampedConstPtr& unitVec,
-		const geometry_msgs::TransformStampedConstPtr& pos, boost::shared_ptr<geometry_msgs::PoseArray> pose_array) {
+        const geometry_msgs::Vector3StampedConstPtr& pos, boost::shared_ptr<geometry_msgs::PoseArray> pose_array) {
 	//ROS_INFO("synced callback");
 
 	geometry_msgs::Pose pose;
-	pose.position.x = pos->transform.translation.x;
-	pose.position.y = pos->transform.translation.y;
-	pose.position.z = pos->transform.translation.z;
+    pose.position.x = pos->vector.x;
+    pose.position.y = pos->vector.y;
+    pose.position.z = pos->vector.z;
 	double roll = 0;
     double pitch = asin(unitVec->vector.z);
     //double yaw = acos(unitVec->vector.x / cos(pitch));
@@ -130,7 +130,7 @@ void syncCallback(const geometry_msgs::Vector3StampedConstPtr& unitVec,
 }
 
 int main(int argc, char **argv) {
-	ros::init(argc, argv, "rviz_marker_listener");
+	ros::init(argc, argv, "rviz_marker");
 
 	ros::NodeHandle node_handle("~");
 	node_handle.param<std::string>("frameid", frame_id, "floor_link");
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
 	ros::Publisher pose_pub = node_handle.advertise<geometry_msgs::PoseArray>("pose_array", 100);
 
 	boost::shared_ptr<visualization_msgs::MarkerArray> marker_array(new visualization_msgs::MarkerArray);
-	ros::Subscriber vis_sub = node_handle.subscribe<geometry_msgs::TransformStamped>(
+    ros::Subscriber vis_sub = node_handle.subscribe<geometry_msgs::Vector3Stamped>(
 			"position2", 100, boost::bind(&updateMarkerArray, _1, marker_array));
 
 
@@ -155,22 +155,22 @@ int main(int argc, char **argv) {
 	boost::shared_ptr<geometry_msgs::PoseArray> pose_array(new geometry_msgs::PoseArray);
 	pose_array->header.frame_id = frame_id;
 	pose_array->header.stamp = ros::Time();
-	message_filters::Subscriber<geometry_msgs::Vector3Stamped> unit_sub(
-			node_handle, "unitvec", 1);
-	message_filters::Subscriber<geometry_msgs::TransformStamped> pos_sub(
-			node_handle, "position1", 1);
-	typedef message_filters::sync_policies::ApproximateTime<
-			geometry_msgs::Vector3Stamped, geometry_msgs::TransformStamped> MySyncPolicy;
-	// ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
-	message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(2),
-			unit_sub, pos_sub);
-	sync.registerCallback(boost::bind(&syncCallback, _1, _2, pose_array));
+//	message_filters::Subscriber<geometry_msgs::Vector3Stamped> unit_sub(
+//			node_handle, "unitvec", 1);
+//    message_filters::Subscriber<geometry_msgs::Vector3Stamped> pos_sub(
+//			node_handle, "position1", 1);
+//	typedef message_filters::sync_policies::ApproximateTime<
+//            geometry_msgs::Vector3Stamped, geometry_msgs::Vector3Stamped> MySyncPolicy;
+//	// ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
+//	message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(2),
+//			unit_sub, pos_sub);
+//	sync.registerCallback(boost::bind(&syncCallback, _1, _2, pose_array));
 
-	ros::Rate r(10);
+    ros::Rate r(100);
 
 	while(node_handle.ok()){
 
-		pose_pub.publish(pose_array);
+//		pose_pub.publish(pose_array);
 		vis_pub.publish(marker_array);
 		marker_array->markers.clear();
 		ros::spinOnce();
