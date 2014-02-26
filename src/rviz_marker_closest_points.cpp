@@ -68,7 +68,7 @@ void updateMarkerArray(const  geometry_msgs::TransformConstPtr& transform,
      marker.color.g = (i*j)/15.0;
      marker.color.b = (i*j)/20.0;
      marker.id = idx;
-     collision_points_marker->markers[idx] = marker;
+     collision_points_marker->markers.push_back(marker);
 }
 
 
@@ -85,7 +85,7 @@ void updateCollisionAvoidance(const  geometry_msgs::TransformConstPtr& transform
      marker.scale.y = ds*2;
      marker.scale.z = ds*2;
      marker.color.a = 0.2;
-     collision_points_marker->markers[idx] = marker;
+     collision_points_marker->markers.push_back(marker);
 }
 
 
@@ -110,11 +110,9 @@ int main(int argc, char **argv) {
 
     boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_marker
             = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
-    collision_points_marker->markers.resize(collision_objects.size()*collision_objects.size());
 
     boost::shared_ptr<visualization_msgs::MarkerArray> avoidance_marker
             = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
-    avoidance_marker->markers.resize(collision_objects.size()*collision_objects.size());
 
 
     std::vector<ros::Subscriber> point_listener;
@@ -125,9 +123,9 @@ int main(int argc, char **argv) {
             int idx = i*collision_objects.size()+j;
 
             // for closest points
-            ros::Subscriber listener = node_handle.subscribe<geometry_msgs::Transform>
-                    (collision_objects[i]+collision_objects[j], 100, boost::bind(&updateMarkerArray, _1, idx, i,j,collision_points_marker));
-            point_listener.push_back(listener);
+//            ros::Subscriber listener = node_handle.subscribe<geometry_msgs::Transform>
+//                    (collision_objects[i]+collision_objects[j], 100, boost::bind(&updateMarkerArray, _1, idx, i,j,collision_points_marker));
+//            point_listener.push_back(listener);
 
             // for collision avoidance (namely P2, considered as fixed point)
             ros::Subscriber avoidance = node_handle.subscribe<geometry_msgs::Transform>
@@ -148,9 +146,11 @@ int main(int argc, char **argv) {
 
     while(node_handle.ok()){
 
-        pub.publish(*collision_points_marker);
+//        pub.publish(*collision_points_marker);
         avoidance_pub.publish(*avoidance_marker);
         ros::spinOnce();
+//        collision_points_marker->markers.clear();
+        avoidance_marker->markers.clear();
         r.sleep();
     }
 
