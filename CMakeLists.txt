@@ -9,67 +9,13 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   roscpp
   tf
+  capsule_msgs
 )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system signals)
 
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
-
-################################################
-## Declare ROS messages, services and actions ##
-################################################
-
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend and a run_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependencies might have been
-##     pulled in transitively but can be declared for certainty nonetheless:
-##     * add a build_depend tag for "message_generation"
-##     * add a run_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
-
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
-
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs
-# )
 
 ###################################
 ## catkin specific configuration ##
@@ -82,7 +28,7 @@ find_package(Boost REQUIRED COMPONENTS system signals)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES rviz_marker
+  LIBRARIES sot_listener closest_points sot_capsule_decomposition
   CATKIN_DEPENDS dynamic_graph_bridge geometry_msgs roscpp tf
 #  DEPENDS system_lib
 )
@@ -105,22 +51,19 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(sot_listener src/rviz_marker_listener_sot.cpp)
-
-## Add cmake target dependencies of the executable/library
-## as an example, message headers may need to be generated before nodes
-# add_dependencies(rviz_marker_node rviz_marker_generate_messages_cpp)
-
-## Specify libraries to link a library or executable target against
 target_link_libraries(sot_listener
    ${catkin_LIBRARIES} ${Boost_LIBRARIES}
 )
-
 
 add_executable(closest_points src/rviz_marker_closest_points.cpp)
 target_link_libraries(closest_points
    ${catkin_LIBRARIES} ${Boost_LIBRARIES}
 )
 
+add_executable(sot_capsule_decomposition src/rviz_marker_sot_capsule_decomposition.cpp)
+target_link_libraries(sot_capsule_decomposition
+   ${catkin_LIBRARIES} ${Boost_LIBRARIES}
+)
 
 
 #############
@@ -137,7 +80,7 @@ target_link_libraries(closest_points
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS closest_points
+install(TARGETS closest_points sot_capsule_decomposition
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

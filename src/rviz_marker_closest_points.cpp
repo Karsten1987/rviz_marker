@@ -68,7 +68,7 @@ void updateMarkerArray(const  geometry_msgs::TransformConstPtr& transform,
      marker.color.g = (i*j)/15.0;
      marker.color.b = (i*j)/20.0;
      marker.id = idx;
-     collision_points_marker->markers.push_back(marker);
+     collision_points_marker->markers[idx] = marker;
 }
 
 
@@ -85,7 +85,7 @@ void updateCollisionAvoidance(const  geometry_msgs::TransformConstPtr& transform
      marker.scale.y = ds*2;
      marker.scale.z = ds*2;
      marker.color.a = 0.2;
-     collision_points_marker->markers.push_back(marker);
+     collision_points_marker->markers[idx] = marker;
 }
 
 
@@ -114,9 +114,11 @@ int main(int argc, char **argv) {
     boost::shared_ptr<visualization_msgs::MarkerArray> avoidance_marker
             = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
 
-
     std::vector<ros::Subscriber> point_listener;
     std::vector<ros::Subscriber> avoidance_listener;
+
+    avoidance_marker->markers.resize(collision_objects.size()*collision_objects.size());
+    collision_points_marker->markers.resize(collision_objects.size()*collision_objects.size());
 
     for (int i = 0; i < collision_objects.size(); ++i) {
         for (int j = 0; j < collision_objects.size(); ++j) {
@@ -140,7 +142,7 @@ int main(int argc, char **argv) {
             updateDI);
 
     ros::Publisher pub = node_handle.advertise<visualization_msgs::MarkerArray>("closest_points", 100);
-        ros::Publisher avoidance_pub = node_handle.advertise<visualization_msgs::MarkerArray>("avoidance", 100);
+    ros::Publisher avoidance_pub = node_handle.advertise<visualization_msgs::MarkerArray>("avoidance", 100);
 
     ros::Rate r(100);
 
@@ -149,8 +151,6 @@ int main(int argc, char **argv) {
 //        pub.publish(*collision_points_marker);
         avoidance_pub.publish(*avoidance_marker);
         ros::spinOnce();
-//        collision_points_marker->markers.clear();
-        avoidance_marker->markers.clear();
         r.sleep();
     }
 
