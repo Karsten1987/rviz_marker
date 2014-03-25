@@ -8,7 +8,6 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_graph_bridge
   geometry_msgs
   roscpp
-  tf
   capsule_msgs
 )
 
@@ -29,7 +28,7 @@ find_package(Boost REQUIRED COMPONENTS system signals)
 catkin_package(
 #  INCLUDE_DIRS include
   LIBRARIES sot_listener closest_points sot_capsule_decomposition
-  CATKIN_DEPENDS dynamic_graph_bridge geometry_msgs roscpp tf
+  CATKIN_DEPENDS dynamic_graph_bridge geometry_msgs roscpp
 #  DEPENDS system_lib
 )
 

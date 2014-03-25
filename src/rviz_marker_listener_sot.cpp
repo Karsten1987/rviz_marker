@@ -23,22 +23,27 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <tf/transform_datatypes.h>
 
-double ds = 0.1;
-double di = 0.2;
-std::string frame_id;
-int pose_array_counter = 1;
-const int max_size = 100;
+const std::string FRAME_ID                  = "floor_link";
+const std::string DS_BASE_TOPIC             = "/sot_controller/ds_";
+const std::string DI_BASE_TOPIC             = "/sot_controller/di_";
+const std::string TRANSFORM_BASE_TOPIC      = "/sot_controller/p2_";
 
-geometry_msgs::PoseArray pose_array;
+typedef visualization_msgs::MarkerArray     MArray;
+typedef visualization_msgs::Marker          M;
+typedef geometry_msgs::TransformStamped     Transform;
+
+
+double ds                                   = 0.1;
+double di                                   = 0.2;
 
 void createMarker(float x, float y, float z, float radius, float r, float g,
-		float b, float a, visualization_msgs::Marker& marker) {
-	marker.header.frame_id = frame_id;
+        float b, float a, M& marker) {
+    marker.header.frame_id = FRAME_ID;
 	marker.header.stamp = ros::Time();
 	marker.ns = "/";
 	marker.id = 0 + int(a * 100);
-	marker.type = visualization_msgs::Marker::SPHERE;
-	marker.action = visualization_msgs::Marker::ADD;
+    marker.type = M::SPHERE;
+    marker.action = M::ADD;
 	marker.pose.position.x = x;
 	marker.pose.position.y = y;
 	marker.pose.position.z = z;
@@ -55,19 +60,18 @@ void createMarker(float x, float y, float z, float radius, float r, float g,
 	marker.color.b = b;
 }
 
-void updateMarkerArray(const geometry_msgs::Vector3StampedConstPtr& transform, boost::shared_ptr<visualization_msgs::MarkerArray> array) {
-//	visualization_msgs::MarkerArray array;
+void updateMarkerArray(const Transform::ConstPtr& transform, MArray& array)
+{
+    M innerBall;
+    M outerBall;
 
-	visualization_msgs::Marker innerBall;
-	visualization_msgs::Marker outerBall;
+    createMarker(transform->transform.translation.x, transform->transform.translation.y,
+            transform->transform.translation.z, di, 0.0, 0.0, 0.0, 0.5, innerBall);
+    createMarker(transform->transform.translation.x, transform->transform.translation.y,
+            transform->transform.translation.z, ds, 1.0, 1.0, 0.0, 0.3, outerBall);
 
-    createMarker(transform->vector.x, transform->vector.y,
-            transform->vector.z, di, 0.0, 0.0, 0.0, 0.5, innerBall);
-    createMarker(transform->vector.x, transform->vector.y,
-            transform->vector.z, ds, 1.0, 1.0, 0.0, 0.3, outerBall);
-
-	array->markers.push_back(innerBall);
-	array->markers.push_back(outerBall);
+    //array.markers[0] = innerBall;
+    array.markers[1] = outerBall;
 }
 
 void updateDS(const std_msgs::Float64ConstPtr& newDS) {
@@ -82,97 +86,39 @@ void updateDI(const std_msgs::Float64ConstPtr& newDI) {
 	}
 }
 
-void syncCallback(const geometry_msgs::Vector3StampedConstPtr& unitVec,
-        const geometry_msgs::Vector3StampedConstPtr& pos, boost::shared_ptr<geometry_msgs::PoseArray> pose_array) {
-	//ROS_INFO("synced callback");
-
-	geometry_msgs::Pose pose;
-    pose.position.x = pos->vector.x;
-    pose.position.y = pos->vector.y;
-    pose.position.z = pos->vector.z;
-	double roll = 0;
-    double pitch = asin(unitVec->vector.z);
-    //double yaw = acos(unitVec->vector.x / cos(pitch));
-
-	//ROS_INFO("vector.z %f", unitVec->vector.z );
-	//ROS_INFO("pitch value %f", pitch);
-	//ROS_INFO("cos of pitch %f", cos(pitch));
-	//ROS_INFO("yaw value %f", yaw);
-
-
-    double sign;
-    if (unitVec->vector.z >=0){
-        sign= 0;
-    }else{
-        sign = M_PI;
-    }
-
-
-    tf::Quaternion q = tf::createQuaternionFromRPY(roll,sign+pitch, sign);
-//    tf::Quaternion q = tf::createQuaternionFromYaw(pitch);
-    pose.orientation.w = q.getW();
-    pose.orientation.x = q.getX();
-    pose.orientation.y = q.getY();
-    pose.orientation.z = q.getZ();
-
-    //ROS_INFO("pose orientation : %f, %f,  %f, %f", q.getW(), q.getX(), q.getY(), q.getZ());
-
-
-	signed int index = pose_array_counter%max_size;
-	//ROS_INFO("index: %i", index);
-	if (pose_array_counter <= max_size){
-		pose_array->poses.push_back(pose);
-	}
-	else{
-		pose_array->poses[index ] = pose;
-	}
-	pose_array_counter++;
-}
-
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "rviz_marker");
 
-	ros::NodeHandle node_handle("~");
-	node_handle.param<std::string>("frameid", frame_id, "floor_link");
-	ROS_INFO("setting frame id to %s", frame_id.c_str());
+    ros::NodeHandle node_handle("~");
 
-	ros::Publisher vis_pub = node_handle.advertise<
-			visualization_msgs::MarkerArray>("collision_array", 100);
+    const std::string actuated_joint_signal = argv[1];
 
-	ros::Publisher pose_pub = node_handle.advertise<geometry_msgs::PoseArray>("pose_array", 100);
-
-	boost::shared_ptr<visualization_msgs::MarkerArray> marker_array(new visualization_msgs::MarkerArray);
-    ros::Subscriber vis_sub = node_handle.subscribe<geometry_msgs::Vector3Stamped>(
-			"position2", 100, boost::bind(&updateMarkerArray, _1, marker_array));
+    ros::Publisher vis_pub = node_handle.advertise<MArray>("external_collision", 100);
 
 
-	ros::Subscriber ds_sub = node_handle.subscribe<std_msgs::Float64>("ds", 1,
+    MArray m_array;
+    m_array.markers.resize(2);
+
+    const std::string transform_topic = TRANSFORM_BASE_TOPIC+actuated_joint_signal;
+    ros::Subscriber vis_sub = node_handle.subscribe<Transform>(
+            transform_topic, 100, boost::bind(&updateMarkerArray, _1, boost::ref(m_array)));
+    ROS_INFO_STREAM("listening to transform topic\t" << transform_topic);
+
+
+    const std::string ds_topic = DS_BASE_TOPIC+actuated_joint_signal;
+    ros::Subscriber ds_sub = node_handle.subscribe<std_msgs::Float64>(ds_topic, 1,
 			updateDS);
-	ros::Subscriber di_sub = node_handle.subscribe<std_msgs::Float64>("di", 1,
+    ROS_INFO_STREAM("listening to ds topic\t" << ds_topic);
+
+    const std::string di_topic = DI_BASE_TOPIC+actuated_joint_signal;
+    ros::Subscriber di_sub = node_handle.subscribe<std_msgs::Float64>(di_topic, 1,
 			updateDI);
+    ROS_INFO_STREAM("listening to di topic\t" << di_topic);
 
-
-	boost::shared_ptr<geometry_msgs::PoseArray> pose_array(new geometry_msgs::PoseArray);
-	pose_array->header.frame_id = frame_id;
-	pose_array->header.stamp = ros::Time();
-//	message_filters::Subscriber<geometry_msgs::Vector3Stamped> unit_sub(
-//			node_handle, "unitvec", 1);
-//    message_filters::Subscriber<geometry_msgs::Vector3Stamped> pos_sub(
-//			node_handle, "position1", 1);
-//	typedef message_filters::sync_policies::ApproximateTime<
-//            geometry_msgs::Vector3Stamped, geometry_msgs::Vector3Stamped> MySyncPolicy;
-//	// ApproximateTime takes a queue size as its constructor argument, hence MySyncPolicy(10)
-//	message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(2),
-//			unit_sub, pos_sub);
-//	sync.registerCallback(boost::bind(&syncCallback, _1, _2, pose_array));
 
     ros::Rate r(100);
-
 	while(node_handle.ok()){
-
-//		pose_pub.publish(pose_array);
-		vis_pub.publish(marker_array);
-		marker_array->markers.clear();
+        vis_pub.publish(m_array);
 		ros::spinOnce();
 		r.sleep();
 	}

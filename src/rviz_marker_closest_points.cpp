@@ -10,8 +10,8 @@
 #include "geometry_msgs/TransformStamped.h"
 
 std::string frame_id = "floor_link";
-double ds = 0.1;
-double di = 0.2;
+double ds = 0.03;
+double di = 0.1;
 
 void updateDS(const std_msgs::Float64ConstPtr& newDS) {
     if (newDS->data != ds) {
@@ -60,34 +60,81 @@ void updateMarkerArray(const  geometry_msgs::TransformConstPtr& transform,
                        const int& idx,
                        const int& i,
                        const int& j,
-                       boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_marker)
+                       boost::shared_ptr<visualization_msgs::MarkerArray>& collision_points_marker)
 {
-     visualization_msgs::Marker marker;
-     updateMarker(transform->translation, marker);
-     marker.color.r = (i*j)/10.0;
-     marker.color.g = (i*j)/15.0;
-     marker.color.b = (i*j)/20.0;
-     marker.id = idx;
-     collision_points_marker->markers[idx] = marker;
+    visualization_msgs::Marker marker;
+    updateMarker(transform->translation, marker);
+    marker.color.r = 0;
+    marker.color.g = 0;
+    marker.color.b = 0;
+    marker.id = idx;
+    collision_points_marker->markers[idx] = marker;
 }
 
 
 void updateCollisionAvoidance(const  geometry_msgs::TransformConstPtr& transform,
-                       const int& idx,
-                       const int& i,
-                       const int& j,
-                       boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_marker)
+                              const int& idx,
+                              const int& i,
+                              const int& j,
+                              boost::shared_ptr<visualization_msgs::MarkerArray>& collision_points_marker)
 {
-     visualization_msgs::Marker marker;
-     updateMarker(transform->translation, marker);
-     marker.id = idx+100;
-     marker.scale.x = ds*2;
-     marker.scale.y = ds*2;
-     marker.scale.z = ds*2;
-     marker.color.a = 0.2;
-     collision_points_marker->markers[idx] = marker;
+    visualization_msgs::Marker marker;
+    updateMarker(transform->translation, marker);
+    marker.id = idx+100;
+    marker.scale.x = ds*2;
+    marker.scale.y = ds*2;
+    marker.scale.z = ds*2;
+    marker.color.a = 0.2;
+    collision_points_marker->markers[idx] = marker;
 }
 
+void fillLineMarker(const boost::shared_ptr<visualization_msgs::MarkerArray>& collision_points_p1,
+                    const boost::shared_ptr<visualization_msgs::MarkerArray>& collision_points_p2,
+                    boost::shared_ptr<visualization_msgs::MarkerArray>& collision_points_line){
+
+    for (int i =0; i< collision_points_p1->markers.size(); ++i){
+
+            int idx = i*collision_points_p1->markers.size()+ i;
+
+                visualization_msgs::Marker marker1 = collision_points_p1->markers[i];
+                visualization_msgs::Marker marker2 = collision_points_p2->markers[i];
+
+                geometry_msgs::Point p1;
+                p1.x = marker1.pose.position.x;
+                p1.y = marker1.pose.position.y;
+                p1.z = marker1.pose.position.z;
+
+                geometry_msgs::Point p2;
+                p2.x = marker2.pose.position.x;
+                p2.y = marker2.pose.position.y;
+                p2.z = marker2.pose.position.z;
+
+
+                if (p2.x != 0 && p2.y != 0 && p2.x != 0 &&
+                    p1.x != 0 && p1.y != 0 && p1.x != 0)
+                {
+                    visualization_msgs::Marker line;
+                    line.header.frame_id = frame_id;
+                    line.header.stamp = ros::Time();
+                    line.ns = "/";
+                    line.type = visualization_msgs::Marker::LINE_STRIP;
+                    line.action = visualization_msgs::Marker::ADD;
+                    line.id = idx;
+
+                    line.scale.x = 0.005;
+                    line.color.r = 0.5;
+                    line.color.g = 0.5;
+                    line.color.b = 0.5;
+                    line.color.a = 1.0;
+
+                    line.points.push_back(p1);
+                    line.points.push_back(p2);
+
+                    collision_points_line->markers.push_back(line);
+                }
+    }
+
+}
 
 void split(std::vector<std::string> &tokens, const std::string &text, char sep) {
     int start = 0, end = 0;
@@ -108,7 +155,13 @@ int main(int argc, char **argv) {
     node_handle.param<std::string>("frameid", frame_id, "floor_link");
     ROS_INFO("setting frame id to %s", frame_id.c_str());
 
-    boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_marker
+    boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_p1
+            = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
+
+    boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_p2
+            = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
+
+    boost::shared_ptr<visualization_msgs::MarkerArray> collision_points_line
             = boost::shared_ptr<visualization_msgs::MarkerArray>(new visualization_msgs::MarkerArray());
 
     boost::shared_ptr<visualization_msgs::MarkerArray> avoidance_marker
@@ -118,16 +171,22 @@ int main(int argc, char **argv) {
     std::vector<ros::Subscriber> avoidance_listener;
 
     avoidance_marker->markers.resize(collision_objects.size()*collision_objects.size());
-    collision_points_marker->markers.resize(collision_objects.size()*collision_objects.size());
+    collision_points_p1->markers.resize(collision_objects.size()*collision_objects.size());
+    collision_points_p2->markers.resize(collision_objects.size()*collision_objects.size());
+//    collision_points_line->markers.resize(collision_objects.size()*collision_objects.size());
 
     for (int i = 0; i < collision_objects.size(); ++i) {
         for (int j = 0; j < collision_objects.size(); ++j) {
             int idx = i*collision_objects.size()+j;
 
             // for closest points
-//            ros::Subscriber listener = node_handle.subscribe<geometry_msgs::Transform>
-//                    (collision_objects[i]+collision_objects[j], 100, boost::bind(&updateMarkerArray, _1, idx, i,j,collision_points_marker));
-//            point_listener.push_back(listener);
+            ros::Subscriber listener_p1 = node_handle.subscribe<geometry_msgs::Transform>
+                    ("p1_"+collision_objects[i]+collision_objects[j], 100, boost::bind(&updateMarkerArray, _1, idx, i,j,collision_points_p1));
+            point_listener.push_back(listener_p1);
+
+            ros::Subscriber listener_p2 = node_handle.subscribe<geometry_msgs::Transform>
+                    ("p2_"+collision_objects[i]+collision_objects[j], 100, boost::bind(&updateMarkerArray, _1, idx, i,j,collision_points_p2));
+            point_listener.push_back(listener_p2);
 
             // for collision avoidance (namely P2, considered as fixed point)
             ros::Subscriber avoidance = node_handle.subscribe<geometry_msgs::Transform>
@@ -137,21 +196,29 @@ int main(int argc, char **argv) {
     }
 
     ros::Subscriber ds_sub = node_handle.subscribe<std_msgs::Float64>("ds", 1,
-            updateDS);
+                                                                      updateDS);
     ros::Subscriber di_sub = node_handle.subscribe<std_msgs::Float64>("di", 1,
-            updateDI);
+                                                                      updateDI);
 
-    ros::Publisher pub = node_handle.advertise<visualization_msgs::MarkerArray>("closest_points", 100);
+    ros::Publisher pub_p1 = node_handle.advertise<visualization_msgs::MarkerArray>("closest_points_p1", 100);
+    ros::Publisher pub_p2 = node_handle.advertise<visualization_msgs::MarkerArray>("closest_points_p2", 100);
     ros::Publisher avoidance_pub = node_handle.advertise<visualization_msgs::MarkerArray>("avoidance", 100);
+    ros::Publisher pub_line = node_handle.advertise<visualization_msgs::MarkerArray>("closest_points_lines", 100);
 
     ros::Rate r(100);
 
     while(node_handle.ok()){
 
-//        pub.publish(*collision_points_marker);
+        pub_p1.publish(*collision_points_p1);
+        pub_p2.publish(*collision_points_p2);
         avoidance_pub.publish(*avoidance_marker);
+
+        fillLineMarker(collision_points_p1,collision_points_p2,collision_points_line);
+        pub_line.publish(collision_points_line);
+
         ros::spinOnce();
         r.sleep();
+        collision_points_line->markers.clear();
     }
 
 }
